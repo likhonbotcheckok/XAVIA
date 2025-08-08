@@ -6,7 +6,7 @@ import fetch from 'node-fetch';
 puppeteer.use(StealthPlugin());
 
 const config = {
-  name: "ck2",
+  name: "cfb",
   description: "Create Facebook accounts using hotmail999 temporary mail and auto fetch confirmation code",
   usage: "cfb <number> - <password> - <mailPrefix>",
   cooldown: 5,
@@ -48,7 +48,8 @@ async function humanType(page, selector, text) {
 
 async function humanMove(page) {
   await page.mouse.move(randomInt(0, 500), randomInt(0, 500));
-  await page.waitForTimeout(randomInt(300, 1000));
+  // Replace waitForTimeout with setTimeout wrapped in a Promise
+  await new Promise(resolve => setTimeout(resolve, randomInt(300, 1000)));
 }
 
 async function createFacebookAccount(name, dob, email, password) {
@@ -81,14 +82,11 @@ async function createFacebookAccount(name, dob, email, password) {
     await humanMove(page);
 
     await page.click('button[name="websubmit"]');
-    await page.waitForTimeout(randomInt(5000, 9000));
+    // Replace waitForTimeout with setTimeout wrapped in a Promise
+    await new Promise(resolve => setTimeout(resolve, randomInt(5000, 9000)));
 
     // check if confirmation code page loaded (facebook usually shows code input here)
     const url = page.url();
-    // If redirected to some confirmation code page or UID available
-    if (url.includes("checkpoint") || url.includes("code") || url.includes("confirm")) {
-      // wait for possible inputs or messages
-    }
 
     // Try get uid from cookie or url
     const cookies = await page.cookies();
