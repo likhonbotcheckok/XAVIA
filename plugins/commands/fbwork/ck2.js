@@ -1,33 +1,17 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import randomUseragent from 'random-useragent';
-import fetch from 'node-fetch';
 
 puppeteer.use(StealthPlugin());
 
 const config = {
   name: "ck2",
-  description: "Create Facebook accounts with random data, given password, and auto proxy rotation",
+  description: "Create Facebook accounts with random data and given password",
   usage: "cfb <number> - <password> - <gmailPrefix>",
   cooldown: 5,
   permissions: [0, 1, 2],
   credits: "RIN"
 };
-
-// === Get Fresh Proxy from API ===
-// Example: Proxyscrape free HTTP proxies
-async function getFreshProxy() {
-  try {
-    const res = await fetch("https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=2000&country=all&ssl=all&anonymity=all");
-    const data = await res.text();
-    const proxies = data.split("\n").filter(p => p.trim() !== "");
-    if (proxies.length === 0) throw new Error("No proxies fetched");
-    return proxies[Math.floor(Math.random() * proxies.length)];
-  } catch (err) {
-    console.error("❌ Proxy fetch error:", err.message);
-    return null;
-  }
-}
 
 // === Utility Functions ===
 function randomInt(min, max) {
@@ -68,10 +52,10 @@ async function humanMove(page) {
 }
 
 // === Facebook Account Creator ===
-async function createFacebookAccount(name, dob, emailOrPhone, password, proxy) {
+async function createFacebookAccount(name, dob, emailOrPhone, password) {
   const launchOptions = {
     headless: "new",
-    args: ['--no-sandbox', '--disable-setuid-sandbox', `--proxy-server=${proxy}`]
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
   };
 
   const browser = await puppeteer.launch(launchOptions);
@@ -146,15 +130,7 @@ export async function onCall({ message, args }) {
       const dob = randomDate();
       const email = randomEmail(prefix);
 
-      const proxy = await getFreshProxy();
-      if (!proxy) {
-        await message.reply(`❌ Could not fetch proxy for account ${i + 1}`);
-        continue;
-      }
-
-      await message.reply(`🌐 Using proxy: ${proxy}`);
-
-      const result = await createFacebookAccount(name, dob, email, password, proxy);
+      const result = await createFacebookAccount(name, dob, email, password);
       if (result) {
         results.push(result);
         await message.reply(
