@@ -48,7 +48,7 @@ async function humanType(page, selector, text) {
 
 async function humanMove(page) {
   await page.mouse.move(randomInt(0, 500), randomInt(0, 500));
-  await page.waitForTimeout(randomInt(300, 1000));
+  await page.waitFor(randomInt(300, 1000)); // changed from waitForTimeout
 }
 
 // === Facebook Account Creator ===
@@ -82,7 +82,7 @@ async function createFacebookAccount(name, dob, emailOrPhone, password) {
     await humanMove(page);
 
     await page.click('button[name="websubmit"]');
-    await page.waitForTimeout(randomInt(5000, 8000));
+    await page.waitFor(randomInt(5000, 8000));  // changed from waitForTimeout
 
     const url = page.url();
     const match = url.match(/profile\.php\?id=(\d+)/);
