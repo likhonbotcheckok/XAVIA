@@ -1,19 +1,19 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import randomUseragent from 'random-useragent';
+import fetch from 'node-fetch';
 
 puppeteer.use(StealthPlugin());
 
 const config = {
   name: "ck2",
-  description: "Create Facebook accounts with random data and given password",
-  usage: "cfb <number> - <password> - <gmailPrefix>",
+  description: "Create Facebook accounts using hotmail999 temporary mail and auto fetch confirmation code",
+  usage: "cfb <number> - <password> - <mailPrefix>",
   cooldown: 5,
   permissions: [0, 1, 2],
   credits: "RIN"
 };
 
-// === Utility Functions ===
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -31,39 +31,32 @@ function randomName() {
   return `${firstNames[randomInt(0, firstNames.length - 1)]} ${lastNames[randomInt(0, lastNames.length - 1)]}`;
 }
 
-function randomEmail(prefix) {
+function randomHotmail999Email(prefix) {
   const chars = 'abcdefghijklmnopqrstuvwxyz1234567890';
   let extra = '';
   for (let i = 0; i < 5; i++) {
     extra += chars.charAt(randomInt(0, chars.length - 1));
   }
-  return `${prefix}${extra}@gmail.com`;
-}
-
-// Delay helper function
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return `${prefix}${extra}@hotmail999.com`;
 }
 
 async function humanType(page, selector, text) {
-  for (let char of text) {
-    await page.type(selector, char, { delay: randomInt(80, 200) });
+  for (const char of text) {
+    await page.type(selector, char, { delay: randomInt(100, 180) });
   }
 }
 
 async function humanMove(page) {
   await page.mouse.move(randomInt(0, 500), randomInt(0, 500));
-  await delay(randomInt(300, 1000));
+  await page.waitForTimeout(randomInt(300, 1000));
 }
 
-// === Facebook Account Creator ===
-async function createFacebookAccount(name, dob, emailOrPhone, password) {
-  const launchOptions = {
+async function createFacebookAccount(name, dob, email, password) {
+  const browser = await puppeteer.launch({
     headless: "new",
     args: ['--no-sandbox', '--disable-setuid-sandbox']
-  };
+  });
 
-  const browser = await puppeteer.launch(launchOptions);
   let uid = null;
 
   try {
@@ -75,85 +68,129 @@ async function createFacebookAccount(name, dob, emailOrPhone, password) {
     await humanMove(page);
     await humanType(page, 'input[name="firstname"]', name.split(' ')[0]);
     await humanType(page, 'input[name="lastname"]', name.split(' ')[1]);
-    await humanType(page, 'input[name="reg_email__"]', emailOrPhone);
+    await humanType(page, 'input[name="reg_email__"]', email);
     await humanType(page, 'input[name="reg_passwd__"]', password);
 
     await page.select('select[name="birthday_day"]', dob.day.toString());
     await page.select('select[name="birthday_month"]', dob.month.toString());
     await page.select('select[name="birthday_year"]', dob.year.toString());
 
-    const genderSelector = ['input[value="1"]', 'input[value="2"]'][Math.floor(Math.random() * 2)];
+    const genderSelector = ['input[value="1"]', 'input[value="2"]'][randomInt(0, 1)];
     await page.click(genderSelector);
+
     await humanMove(page);
 
     await page.click('button[name="websubmit"]');
-    await delay(randomInt(5000, 8000));
+    await page.waitForTimeout(randomInt(5000, 9000));
 
+    // check if confirmation code page loaded (facebook usually shows code input here)
     const url = page.url();
-    const match = url.match(/profile\.php\?id=(\d+)/);
-    if (match && match[1]) {
-      uid = match[1];
-    } else {
-      const cookies = await page.cookies();
-      const c_user = cookies.find(c => c.name === 'c_user');
-      if (c_user) uid = c_user.value;
+    // If redirected to some confirmation code page or UID available
+    if (url.includes("checkpoint") || url.includes("code") || url.includes("confirm")) {
+      // wait for possible inputs or messages
     }
 
-    return {
-      emailOrPhone,
-      password,
-      name,
-      dob,
-      uid: uid || '❓ Not available',
-      status: "🕓 Waiting for confirmation code"
-    };
+    // Try get uid from cookie or url
+    const cookies = await page.cookies();
+    const c_user = cookies.find(c => c.name === 'c_user');
+    if (c_user) uid = c_user.value;
 
+    return { email, password, name, dob, uid, status: "Waiting for confirmation code" };
   } catch (err) {
-    console.error('Error creating account:', err);
+    console.error('Error creating Facebook account:', err);
     return null;
   } finally {
     await browser.close();
   }
 }
 
-// === Command Handler ===
+// Hotmail999 থেকে কোড নিয়ে আসার ফাংশন
+async function getVerificationCode(email) {
+  try {
+    const url = `https://hotmail999.com/api/get_mail.php?email=${encodeURIComponent(email)}`;
+    const res = await fetch(url);
+    const json = await res.json();
+
+    if (json.status && json.data && json.data.length > 0) {
+      const latestMail = json.data[0];
+      if (latestMail.code) {
+        return latestMail.code;
+      }
+    }
+    return null;
+  } catch (err) {
+    console.error('Error fetching verification code:', err.message);
+    return null;
+  }
+}
+
+// ================== Command Handler ===================
 export async function onCall({ message, args }) {
   try {
-    if (args.length < 5) return message.reply("Usage: cfb <number> - <password> - <gmailPrefix>");
+    if (args.length < 5)
+      return message.reply("Usage: cfb <number> - <password> - <mailPrefix>");
 
     const numberCount = parseInt(args[0]);
-    if (isNaN(numberCount) || numberCount <= 0) return message.reply("Please enter a valid number.");
+    if (isNaN(numberCount) || numberCount <= 0)
+      return message.reply("Please enter a valid number.");
 
-    if (args[1] !== '-') return message.reply("Use format: cfb <number> - <password> - <gmailPrefix>");
+    if (args[1] !== '-') return message.reply("Use format: cfb <number> - <password> - <mailPrefix>");
 
     const password = args[2];
     const prefix = args[4];
 
     let results = [];
+
     for (let i = 0; i < numberCount; i++) {
       const name = randomName();
       const dob = randomDate();
-      const email = randomEmail(prefix);
+      const email = randomHotmail999Email(prefix);
 
-      const result = await createFacebookAccount(name, dob, email, password);
-      if (result) {
-        results.push(result);
-        await message.reply(
-          `✅ Account ${i + 1} created:\n` +
-          `👤 Name: ${result.name}\n` +
-          `📧 Email: ${result.emailOrPhone}\n` +
-          `🔑 Password: ${result.password}\n` +
-          `🎂 DOB: ${result.dob.day}/${result.dob.month}/${result.dob.year}\n` +
-          `🆔 UID: ${result.uid}\n` +
-          `📨 Status: ${result.status}`
-        );
+      await message.reply(`🔄 Creating account ${i + 1} with email: ${email}`);
+
+      const createResult = await createFacebookAccount(name, dob, email, password);
+
+      if (!createResult) {
+        await message.reply(`❌ Failed to create account ${i + 1}`);
+        continue;
+      }
+
+      await message.reply(`⏳ Waiting for verification code for ${email}... (may take some seconds)`);
+
+      // Polling hotmail999 API max 12 times (every 5 sec) to get code
+      let code = null;
+      for (let tryCount = 0; tryCount < 12; tryCount++) {
+        code = await getVerificationCode(email);
+        if (code) break;
+        await new Promise(res => setTimeout(res, 5000)); // wait 5 seconds
+      }
+
+      if (!code) {
+        await message.reply(`❌ Could not get verification code for ${email}`);
+        results.push({ ...createResult, code: null });
       } else {
-        await message.reply(`❌ Error creating account ${i + 1}`);
+        await message.reply(`✅ Verification code for ${email}: ${code}`);
+        results.push({ ...createResult, code });
       }
     }
 
-    if (!results.length) return message.reply("❌ No accounts were created.");
+    if (results.length === 0)
+      return message.reply("❌ No accounts were created.");
 
+    // Final summary (optional)
+    let summary = `🎉 Created ${results.length} account(s):\n\n`;
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      summary += `Account ${i + 1}:\n`;
+      summary += `👤 Name: ${r.name}\n`;
+      summary += `📧 Email: ${r.email}\n`;
+      summary += `🔑 Password: ${r.password}\n`;
+      summary += `🎂 DOB: ${r.dob.day}/${r.dob.month}/${r.dob.year}\n`;
+      summary += `🆔 UID: ${r.uid}\n`;
+      summary += `📨 Code: ${r.code ?? "Not received"}\n\n`;
+    }
+
+    await message.reply(summary);
   } catch (e) {
     await message.reply("❌ Error: " + e.message);
   }
