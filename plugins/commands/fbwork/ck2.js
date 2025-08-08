@@ -6,7 +6,7 @@ import fetch from 'node-fetch';
 puppeteer.use(StealthPlugin());
 
 const config = {
-  name: "cfb",
+  name: "ck2",
   description: "Create Facebook accounts with random data, given password, and auto proxy rotation",
   usage: "cfb <number> - <password> - <gmailPrefix>",
   cooldown: 5,
