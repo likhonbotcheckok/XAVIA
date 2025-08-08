@@ -40,6 +40,11 @@ function randomEmail(prefix) {
   return `${prefix}${extra}@gmail.com`;
 }
 
+// Delay helper function
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function humanType(page, selector, text) {
   for (let char of text) {
     await page.type(selector, char, { delay: randomInt(80, 200) });
@@ -48,7 +53,7 @@ async function humanType(page, selector, text) {
 
 async function humanMove(page) {
   await page.mouse.move(randomInt(0, 500), randomInt(0, 500));
-  await page.waitFor(randomInt(300, 1000)); // changed from waitForTimeout
+  await delay(randomInt(300, 1000));
 }
 
 // === Facebook Account Creator ===
@@ -82,7 +87,7 @@ async function createFacebookAccount(name, dob, emailOrPhone, password) {
     await humanMove(page);
 
     await page.click('button[name="websubmit"]');
-    await page.waitFor(randomInt(5000, 8000));  // changed from waitForTimeout
+    await delay(randomInt(5000, 8000));
 
     const url = page.url();
     const match = url.match(/profile\.php\?id=(\d+)/);
