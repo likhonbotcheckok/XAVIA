@@ -6,7 +6,7 @@ import fetch from 'node-fetch';
 puppeteer.use(StealthPlugin());
 
 const config = {
-  name: "cfb",
+  name: "ck2",
   description: "Create Facebook accounts using hotmail999 temporary mail and auto fetch confirmation code",
   usage: "cfb <number> - <password> - <mailPrefix>",
   cooldown: 5,
